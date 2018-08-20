@@ -16,7 +16,7 @@ pie <- data.frame(
 
 p <- ggplot() + theme_no_axes() + coord_fixed()
 
-# For low level control you define the start and end angles yourself
+# draw 2 arcs
 p + geom_arc_bar(
   aes(
     x0 = 0,

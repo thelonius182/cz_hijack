@@ -1,4 +1,7 @@
 library(readr)
+library(stringr)
+
+
 hijack_sessions <-
   read_delim(
     "data/hijack_export.txt",

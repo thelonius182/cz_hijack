@@ -1,0 +1,13 @@
+activate application "Audio Hijack"
+tell application "System Events"
+	tell process "Audio Hijack"
+		set czSessions to every UI element of UI element 1 of scroll area 1 of window "Audio Hijack"
+		repeat with aCZSession in czSessions
+			log "session = " & description of aCZSession
+			set czSessionTimers to every UI element of aCZSession
+			repeat with aCZSessionTimer in czSessionTimers
+				log "timer = " & description of aCZSessionTimer
+			end repeat
+		end repeat
+	end tell
+end tell

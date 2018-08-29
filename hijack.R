@@ -4,7 +4,7 @@ library(stringr)
 
 hijack_sessions <-
   read_delim(
-    "data/hijack_export.txt",
+    "data/hijack_export_uz.txt",
     "\t",
     escape_double = FALSE,
     col_names = c("script"),

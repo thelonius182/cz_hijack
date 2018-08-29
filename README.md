@@ -1,2 +1,2 @@
-# rstudio
-Repo for R-projects
+# cz_hijack
+Sanitize session overview produced by hijack

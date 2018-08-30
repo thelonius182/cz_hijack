@@ -1,5 +1,6 @@
 library(stringi)
 library(stringr)
+library(lubridate)
 
 repair_missing_names <- function(session_names) {
   result = NA
@@ -16,6 +17,20 @@ repair_missing_names <- function(session_names) {
       result[i1] = sav_session_name
     }
     
+  }
+  
+  return(result)
+}
+
+round_to_nearest_hour <- function(time_string, type) {
+  # expects a string like "14:01"
+  a_date_string <- paste0("1958-12-25 ", time_string, ":00.00")
+  a_date <- ymd_hms(a_date_string)
+  to_nearest_hour <- round_date(a_date, "hour")
+  result <- as.integer(hour(to_nearest_hour))
+  
+  if (result == 0 & type == "end") {
+    result = 24
   }
   
   return(result)
@@ -57,3 +72,5 @@ sessions <- filter(sessions, str_detect(session_export, "^.*:.*$"))
 
 pat_period <- "^.*= (.*) from (.{5}) to (.{5})"
 period <- str_match(sessions$session_export, pattern = pat_period)
+
+round_to_nearest_hour("23:58", "begin")

@@ -36,6 +36,7 @@ sessions_uz <- bind_cols(session_names_uz, sessions_export_uz) %>%
   select(session_names = session_names_uz,
          session_export = sessions_export_uz,
          mac)
+rm(session_names_uz, sessions_export_uz)
 
 extr_session_names_lg <- str_match(sessions_export_lg, pattern = pat_session)[, 2]
 session_names_lg <- repair_missing_names(extr_session_names_lg)
@@ -47,8 +48,12 @@ sessions_lg <- bind_cols(session_names_lg, sessions_export_lg) %>%
   select(session_names = session_names_lg,
          session_export = sessions_export_lg,
          mac)
+rm(session_names_lg, sessions_export_lg)
 
 sessions <- bind_rows(sessions_uz, sessions_lg)
-# only keep lines not containing "button" or "session", using negative look-around
-sessions <- filter(sessions, str_detect(session_export, "^((?!button|session).)*$"))
+rm(sessions_uz, sessions_lg)
+# only keep lines having some timestamp, so containing an ":"
+sessions <- filter(sessions, str_detect(session_export, "^.*:.*$"))
 
+pat_period <- "^.*= (.*) from (.{5}) to (.{5})"
+period <- str_match(sessions$session_export, pattern = pat_period)

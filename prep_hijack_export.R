@@ -1,7 +1,15 @@
 library(stringi)
 library(stringr)
 library(lubridate)
+library(dplyr)
+library(magrittr)
+library(tidyr)
 
+# -------------------------------------------------------------------------
+# Replace NA's by preceding label
+# Example: c("label-A", NA, NA, "label-B", NA) is converted to
+#          c("label-A", "label-A", "label-A", "label-B", "label-B") 
+# -------------------------------------------------------------------------
 repair_missing_names <- function(session_names) {
   result = NA
   i1 = 0
@@ -22,12 +30,22 @@ repair_missing_names <- function(session_names) {
   return(result)
 }
 
+# -------------------------------------------------------------------------
+# Move clock to the nearest hour. 
+# parm Type indicates whether this hour starts or stops a period.
+#           Needed for rounding to "midnight" - start of event: round to 0
+#                                             - end: round to 24
+# Examples: "19:01" converts to 19
+#           "19:56" converts to 20
+#           "00:01" and "23:58" convert to 0 if type=begin
+#           "00:01" converts to 24 if type=end
+# -------------------------------------------------------------------------
 round_to_nearest_hour <- function(time_string, type) {
   # expects a string like "14:01"
   a_date_string <- paste0("1958-12-25 ", time_string, ":00.00")
   a_date <- ymd_hms(a_date_string)
-  to_nearest_hour <- round_date(a_date, "hour")
-  result <- as.integer(hour(to_nearest_hour))
+  nearest_hour <- round_date(a_date, "hour")
+  result <- as.integer(hour(nearest_hour))
   
   if (result == 0 & type == "end") {
     result = 24
@@ -67,10 +85,45 @@ rm(session_names_lg, sessions_export_lg)
 
 sessions <- bind_rows(sessions_uz, sessions_lg)
 rm(sessions_uz, sessions_lg)
-# only keep lines having some timestamp, so containing an ":"
+# only keep rows having some timestamp, so containing an ":"
 sessions <- filter(sessions, str_detect(session_export, "^.*:.*$"))
 
-pat_period <- "^.*= (.*) from (.{5}) to (.{5})"
-period <- str_match(sessions$session_export, pattern = pat_period)
+# extract days, start and duration and add to sessions
+pat_start_len <- "^.*= (.*) from (.{5}).*\\(for (\\d+)"
+period <- str_match(sessions$session_export, pattern = pat_start_len)
+sessions %<>% 
+  mutate(start = period[, 3],
+         hours = period[, 4],
+         days = period[, 2])
 
-round_to_nearest_hour("23:58", "begin")
+# normalize day names
+sessions$days %<>% 
+  str_to_lower %>% 
+  str_replace_all(pattern = "weekdays", "mo, tu, we, th, fr") %>% 
+  str_replace_all(pattern = "mondays", "mo") %>% 
+  str_replace_all(pattern = "tuesdays", "tu") %>% 
+  str_replace_all(pattern = "wednesdays", "we") %>% 
+  str_replace_all(pattern = "thursdays", "th") %>% 
+  str_replace_all(pattern = "fridays", "fr") %>% 
+  str_replace_all(pattern = "saturdays", "sa") %>% 
+  str_replace_all(pattern = "sundays", "su") %>% 
+  str_replace_all(pattern = ",", "") %>% 
+  str_replace_all(pattern = " and ", " ") 
+
+# only keep rows with normalized day names (effectively this removes all once-only sessions)
+sessions %<>% 
+  filter(str_detect(days, pattern = "mo|tu|we|th|fr|sa|su"))
+
+# prep & gather days (cols to rows), keeping only non-empty days
+days <- str_split(sessions$days, pattern = " ", simplify = TRUE, n = 7) %>% as.data.frame
+sessions <-
+  bind_cols(sessions, days) %>%
+  gather(key = "session_day", value = "day", V1:V7) %>%
+  filter(day != "")
+
+sessions %<>% 
+  select(session_names, mac, start, hours, day_names = day) %>% 
+  mutate(hours = as.numeric(hours))
+
+
+# round_to_nearest_hour("23:58", "begin")

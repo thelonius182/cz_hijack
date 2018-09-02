@@ -39,17 +39,24 @@ repair_missing_names <- function(session_names) {
 }
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-# Move clock to the nearest hour. 
-# 
-# Examples: "19:[00..29]" converts to 19, same day
-#           "19:[30..59]" converts to 20, same day
-#           "00:[00..29]" converts to 0, same day
-#           "23:[30..59]" converts to 0, next day
+# Adjust session start: move broken hours forward to Top Of The Hour
+#
+# IN  time - chr(5), start of session
+#                    format hh:mm (assume valid, by courtesy of Hijack)
+#     day  - chr(2), a valid weekday name (mo, tu, ... su)
+#
+# OUT result - date, the adjusted session start with a dummy date
+#                    
+# Examples: adjust_start("19:58", "tu")
+#           result = 
+#           23:59 converts to 00, next day
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-begin_of <- function(time_string, day) {
-  # expects a string like "14:01"
+adjust_start <- function(time, day) {
+  # minutes mm in starttime should be as CZ has them: mm = 00 or 31 <= mm <= 59
+  mm = as.integer(str_sub(time, 4, 2))
+  if (mm != 0 and )
   a_date = filter(dummyDates, weekdays == day)[,2]
-  a_date_string <- paste0(a_date, " ", time_string, ":00.00")
+  a_date_string <- paste0(a_date, " ", time, ":00.00")
   a_date = ymd_hms(a_date_string)
   date_nearest_hour <- round_date(a_date, "hour")
   

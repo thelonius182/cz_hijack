@@ -1,5 +1,5 @@
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-# Prefer "filter" from dplyr (not from stats)
+# Prefer dplyr functions
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 filter <- dplyr::filter
 
@@ -8,11 +8,7 @@ filter <- dplyr::filter
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 weekdays <- c("mo", "tu", "we", "th", "fr", "sa", "su")
 ord_weekdays <- factor(weekdays, levels = weekdays)
-dummyDates <- as.data.frame(weekdays) %>% 
-  mutate(date = as.character(ymd("2018-08-20") + 0:6),
-         next_day = c("tu", "we", "th", "fr", "sa", "su", "mo")
-  )
-
+next_weekdays <-  c("tu", "we", "th", "fr", "sa", "su", "mo")
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 # Replace NA's by preceding label
@@ -51,20 +47,29 @@ repair_missing_names <- function(session_names) {
 #           result = 
 #           23:59 converts to 00, next day
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-adjust_start <- function(time, day) {
-  # minutes mm in starttime should be as CZ has them: mm = 00 or 31 <= mm <= 59
-  mm = as.integer(str_sub(time, 4, 2))
-  if (mm != 0 and )
-  a_date = filter(dummyDates, weekdays == day)[,2]
-  a_date_string <- paste0(a_date, " ", time, ":00.00")
-  a_date = ymd_hms(a_date_string)
-  date_nearest_hour <- round_date(a_date, "hour")
+adjust_start <- function(starttime, day) {
+  start_hh = as.integer(str_sub(starttime, 1, 2))
+  start_mm = as.integer(str_sub(starttime, 4, 5))
+  start_day = day
   
-  if (result == 0 & type == "end") {
-    result = 24
+  if (1 <= start_mm & start_mm <= 55){
+    stop(paste0("minutes of starttime should be TOTH or slightly before: ", starttime))
   }
   
-  return(result)
+  if (start_mm != 0) {
+    start_mm = 0
+    start_hh = start_hh + 1 # modulo operator would hide day correction
+    
+    if (start_hh == 24) {
+      start_hh = 0
+      start_day <<- next_weekdays[which(weekdays %in% as.vector(day))]
+    }
+  }
+  
+  return(str_c(as.character(start_hh), ", ",
+               as.character(start_mm), ", ",
+               start_day, "."
+  ))
 }
 # get the exports ----
 sessions_export_uz <- stri_read_lines("data/hijack_export_uz.txt")
@@ -107,12 +112,12 @@ rm(sessions_uz, sessions_lg)
 # only keep timestamp rows ----
 # so containing an ":"
 sessions %<>% 
-  filter(str_detect(session_export, pattern = "^.*:.*$"))
+  dplyr::filter(str_detect(session_export, pattern = "^.*:.*$"))
 
 # extract days ... ----
 # and start and duration and add to sessions 
-pat_start_len <- "^.*= (.*) from (.{5}).*\\(for (\\d+)"
-period <- str_match(sessions$session_export, pattern = pat_start_len)
+pat_start_dur <- "^.*= (.*) from (.{5}).*\\(for (\\d+)"
+period <- str_match(sessions$session_export, pattern = pat_start_dur)
 sessions %<>% 
   mutate(start = period[, 3],
          hours = period[, 4],
@@ -156,5 +161,4 @@ sessions %<>%
 
 # add begin and end of logging ----
 # = timestamps; rounds to nearest hour and corrects day if start = 23:xx (xx >= 30)
-session %<>% mutate(begin = begin_of(start),
-                    end = begin + hours(hours))
+sessions %<>% mutate(begin = adjust_start(start, day_names))

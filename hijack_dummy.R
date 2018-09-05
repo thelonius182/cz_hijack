@@ -11,7 +11,7 @@ mydata <- read.table(
   rod05              di   00    b     a  
   rod05              di   07    e     a  
   rod04              wo   17    b     a  
-  rod04              wo   18    e     a  
+  rod04              wo   25    e     a  
   "
 )
 
@@ -19,11 +19,11 @@ mydata$server = factor(mydata$server, levels = c("a", "b"), labels = c("log-mac"
 mydata$dag = factor(mydata$dag, levels = c("wo", "di", "ma"), labels = c("woensdag", "dinsdag", "maandag"))
 mydata$group = factor(mydata$dag)
 
-uur_labels = c(0:24) %>% as.character
-uur_breaks = seq(from = 0, to = 24, 1)
+uur_labels = c(0:25) %>% as.character
+uur_breaks = seq(from = 0, to = 25, 1)
 
 ggplot(mydata, aes(x = uur, y = sessie, fill = server)) +
-  scale_x_continuous(limits=c(0, 24), expand = c(0, 1), breaks = uur_breaks, labels = uur_labels) +  
+  scale_x_continuous(limits=c(0, 25), expand = c(0, 1), breaks = uur_breaks, labels = uur_labels) +  
   scale_fill_manual(values = c("log-mac" = "#F37735", "uitzend-mac" = "#00AEDB")) +
   labs(title = "CZ backups", 
        x = "\nopgenomen uren",

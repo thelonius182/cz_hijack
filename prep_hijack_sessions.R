@@ -35,42 +35,46 @@ repair_missing_names <- function(session_names) {
 }
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-# Adjust session start: move broken hours forward to Top Of The Hour
+# Build session period from session start etc.
+# 
+# Move broken hours forward to Top Of The Hour.
 #
-# IN  time - chr(5), start of session
-#                    format hh:mm (assume valid, by courtesy of Hijack)
-#     day  - chr(2), a valid weekday name (mo, tu, ... su)
-#
-# OUT result - date, the adjusted session start with a dummy date
-#                    
-# Examples: adjust_start("19:58", "tu")
-#           result = 
-#           23:59 converts to 00, next day
+# NB - day enters the function as a number instead of a chr (so 1 for mo etc)
+#      this is due to it being a factor; it needes to be a factor to allow
+#      correct weekday ordering (not lexcial!)
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-adjust_start <- function(starttime, day) {
+build_period <- function(day, starttime, duration) {
   start_hh = as.integer(str_sub(starttime, 1, 2))
   start_mm = as.integer(str_sub(starttime, 4, 5))
-  start_day = day
-  
+  duration = as.integer(duration)
+  start_day = ord_weekdays[day] 
   if (1 <= start_mm & start_mm <= 55){
-    stop(paste0("minutes of starttime should be TOTH or slightly before: ", starttime))
+    stop(paste0("invalid starttime: ", starttime, " (required: minutes in [0, 54:59]"))
   }
   
   if (start_mm != 0) {
-    start_mm = 0
-    start_hh = start_hh + 1 # modulo operator would hide day correction
+    start_mm <- 0
+    start_hh <- start_hh + 1 # modulo operator would hide day correction
     
     if (start_hh == 24) {
-      start_hh = 0
-      start_day <<- next_weekdays[which(weekdays %in% as.vector(day))]
+      start_hh <- 0
+      start_day <- next_weekdays[which(weekdays == start_day)]
     }
   }
   
-  return(str_c(as.character(start_hh), ", ",
-               as.character(start_mm), ", ",
-               start_day, "."
-  ))
+  stop_hh <- start_hh + duration
+  
+  if (stop_hh > 24) {
+    message(paste0("Warning: session across 2 days detected (input = ", day, ", ", starttime, ", ", duration, ")"))
+  }
+  
+  start_hh <- paste0("00", start_hh) %>% str_sub(., -2)
+  start_mm <- paste0("00", start_mm) %>% str_sub(., -2)
+  stop_hh <- paste0("00", stop_hh) %>% str_sub(., -2)
+  
+  return(str_c(start_day, "|", start_hh, ":", start_mm, "|", stop_hh, ":00"))
 }
+
 # get the exports ----
 sessions_export_uz <- stri_read_lines("data/hijack_export_uz.txt")
 sessions_export_lg <- stri_read_lines("data/hijack_export_lg.txt")
@@ -90,19 +94,19 @@ rm(extr_session_names_uz, extr_session_names_lg)
 session_names_uz <- as.data.frame(session_names_uz)
 sessions_export_uz <- as.data.frame(sessions_export_uz)
 sessions_uz <- bind_cols(session_names_uz, sessions_export_uz) %>% 
-  mutate(mac = "uz") %>% 
+  mutate(server = "uz") %>% 
   select(session_names = session_names_uz,
          session_export = sessions_export_uz,
-         mac)
+         server)
 rm(session_names_uz, sessions_export_uz)
 
 session_names_lg <- as.data.frame(session_names_lg)
 sessions_export_lg <- as.data.frame(sessions_export_lg)
 sessions_lg <- bind_cols(session_names_lg, sessions_export_lg) %>% 
-  mutate(mac = "lg") %>% 
+  mutate(server = "lg") %>% 
   select(session_names = session_names_lg,
          session_export = sessions_export_lg,
-         mac)
+         server)
 rm(session_names_lg, sessions_export_lg)
 
 # unite lg/uz-sessions ----
@@ -149,16 +153,38 @@ days_by_col <- str_split(sessions$days, pattern = " ", simplify = TRUE, n = 7) %
 sessions <-
   bind_cols(sessions, days_by_col) %>%
   gather(key = "day_column", value = "day", V1:V7) %>%
-  filter(day != "")
+  filter(day != "") %>% 
+  select(session_names, server, day, start, hours) %>% 
+  mutate(day = factor(day, levels = ord_weekdays),
+         server = factor(server, levels = c("uz", "lg"), labels = c("uitzend-mac", "log-mac"))
+  ) %>% 
+  arrange(day, start) 
 
-# minimize to essential variables ----
-# make hours numeric and order day names
-sessions %<>% 
-  select(session_names, mac, day_names = day, start, hours) %>% 
-  mutate(hours = as.numeric(hours),
-         day_names = factor(day_names, levels = ord_weekdays)) %>% 
-  arrange(day_names, start, hours)
-
-# add begin and end of logging ----
+# add begin and end of sessions ----
 # = timestamps; rounds to nearest hour and corrects day if start = 23:xx (xx >= 30)
-sessions %<>% mutate(begin = adjust_start(start, day_names))
+periods <- pmap( list(sessions$day, sessions$start, sessions$hours), build_period) %>% unlist
+
+sessions %<>% mutate(period = periods) %>% 
+  mutate(id = 1:nrow(sessions))
+
+sessions %<>%
+  separate(col = period,
+           sep = "\\|",
+           into = c("ses_dag", "ses_str", "ses_stp")) %>%
+  gather(key = "grens", value = "hhmm", ses_str:ses_stp) %>%
+  mutate(uur = as.integer(str_sub(hhmm, 1, 2)),
+         dag = factor(ses_dag,
+                      levels = c("su", "sa", "fr", "th", "we", "tu", "mo"),
+                      labels = c("zondag",
+                                 "zaterdag",
+                                 "vrijdag",
+                                 "donderdag",
+                                 "woensdag",
+                                 "dinsdag",
+                                 "maandag")
+         ),
+         sessie = factor(session_names),
+         grens = factor(grens)
+  ) %>% 
+  arrange(dag, id, uur) %>% 
+  select(sessie, dag, uur, grens, server)

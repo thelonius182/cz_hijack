@@ -8,7 +8,7 @@
 uur_labels = c(0:25) %>% as.character
 uur_breaks = seq(from = 0, to = 25, 1)
 
-ggplot(sessions, aes(x = uur, y = sessie, fill = server)) +
+ggplot(sessions, aes(x = begin, y = sessienaam, fill = server)) +
   scale_x_continuous(limits=c(0, 25), expand = c(0, 1), breaks = uur_breaks, labels = uur_labels) +
   scale_fill_manual(values = c("log-mac" = "#F37735", "uitzend-mac" = "#00AEDB")) +
   labs(title = "CZ backups", 
@@ -28,7 +28,8 @@ ggplot(sessions, aes(x = uur, y = sessie, fill = server)) +
         panel.grid.minor = element_blank(),
         strip.text = element_text(size=18)
   ) +
-  geom_line(size = 2, colour = "#8C8C8C", na.rm = TRUE) +
-  geom_label(aes(label = uur), na.rm = TRUE) +
+  # geom_line(size = 2, colour = "#8C8C8C", na.rm = TRUE) +
+  geom_label(aes(label = begin), na.rm = TRUE) +
+  geom_label(aes(label = eind), na.rm = TRUE) +
   facet_grid(dag ~ ., scales = "free")
 

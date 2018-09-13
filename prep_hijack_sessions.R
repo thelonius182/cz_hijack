@@ -165,26 +165,22 @@ sessions <-
 periods <- pmap( list(sessions$day, sessions$start, sessions$hours), build_period) %>% unlist
 
 sessions %<>% mutate(period = periods) %>% 
-  mutate(id = 1:nrow(sessions))
-
-sessions %<>%
-  separate(col = period,
-           sep = "\\|",
-           into = c("ses_dag", "ses_str", "ses_stp")) %>%
-  gather(key = "grens", value = "hhmm", ses_str:ses_stp) %>%
-  mutate(uur = as.integer(str_sub(hhmm, 1, 2)),
-         dag = factor(ses_dag,
-                      levels = c("su", "sa", "fr", "th", "we", "tu", "mo"),
-                      labels = c("zondag",
+  separate(col = period, into = c("period_dag", "period_begin", "period_end"), sep = "\\|", remove = T) %>% 
+  separate(col = period_begin, into = c("period_begin_hh", "period_begin_mm"), sep = ":", remove = T) %>% 
+  separate(col = period_end, into = c("period_end_hh", "period_end_mm"), sep = ":", remove = T) %>% 
+  rename(lengte = hours, sessienaam = session_names, dag = day) %>% 
+  select(sessienaam, server, dag, period_begin_hh, period_end_hh, lengte) %>% 
+  mutate(begin = as.integer(period_begin_hh), eind = as.integer(period_end_hh)) %>% 
+  select(sessienaam, server, dag, begin, eind, lengte) %>% 
+  mutate(dag = factor(dag,
+                      levels = rev(c("su", "sa", "fr", "th", "we", "tu", "mo")),
+                      labels = rev(c("zondag",
                                  "zaterdag",
                                  "vrijdag",
                                  "donderdag",
                                  "woensdag",
                                  "dinsdag",
-                                 "maandag")
+                                 "maandag"))
          ),
-         sessie = factor(session_names),
-         grens = factor(grens)
-  ) %>% 
-  arrange(dag, id, uur) %>% 
-  select(sessie, dag, uur, grens, server)
+         sessienaam = factor(sessienaam)
+  )
